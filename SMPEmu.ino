@@ -45,6 +45,13 @@ void do_wait_clock_fall() {
     }
 }
 
+void do_wait_clock_rise() {
+  while( !digitalRead(CLOCK_PIN) ) {  
+      // while clock is high, waiting
+      delayMicroseconds(5); // NB: Maybe remove?
+    }
+}
+
 // Read a byte from input
 byte do_get_byte() {
   pinMode(DATA_PIN, INPUT);
@@ -59,6 +66,8 @@ byte do_get_byte() {
     current_byte = current_byte << 1;
     if( digitalRead(DATA_PIN) ) 
       current_byte += 1; // set last bit to 1 if DATA high
+
+    do_wait_clock_rise();
   }
   return current_byte;
 }
@@ -78,6 +87,8 @@ void do_send_byte(byte toSend) {
       digitalWrite(DATA_PIN, HIGH);
     else
       digitalWrite(DATA_PIN, LOW);
+
+    do_wait_clock_rise();
       
   }
 }
