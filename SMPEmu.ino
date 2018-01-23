@@ -23,6 +23,7 @@
  */
 
 word current_address = 0x0; // 1-word address register of the SMP
+boolean is_locked = false; // when the cartridge is locked, r/w instructions are ignored
 
 byte current_command = 0x0; 
 /* Allowed commands:
@@ -83,7 +84,7 @@ void do_send_byte(byte toSend) {
     // shift right 1 bit
     current_byte = current_byte >> 1;
     // set output high if last bit is 1
-    if( current_byte & 0x1 > 0x0 ) 
+    if( (current_byte & 0x1) > 0x0 ) 
       digitalWrite(DATA_PIN, HIGH);
     else
       digitalWrite(DATA_PIN, LOW);
@@ -93,7 +94,7 @@ void do_send_byte(byte toSend) {
   }
 }
 
-extern const PROGMEM byte cart_image[];
+extern const unsigned char cart_image[];
 
 // Gets executed when SELECT is pulled low
 void recvCommand() {
@@ -106,6 +107,12 @@ void recvCommand() {
 
   // Now accept the data
   switch(current_command) {
+    
+    case 0x00: // query status
+      // TODO: Implement password errors counter
+      do_send_byte( is_locked ? 0x01 : 0x00 );
+      break;
+    
     case 0xA0: // set address
         {
           byte hi = do_get_byte(); 
@@ -124,6 +131,7 @@ void recvCommand() {
       break;
 
     case 0xD0: // read postincrement
+          if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
           while( digitalRead(SELECT_PIN) ) {
             byte current_byte = pgm_read_byte(cart_image[current_address]);
@@ -131,8 +139,66 @@ void recvCommand() {
             ++current_address;
           }
       break;
+      
+     case 0xC0: // write postincrement
+          if(is_locked) return;
+          while( digitalRead(SELECT_PIN) ) {
+           byte current_byte = do_get_byte();
+           // TODO: actual write
+           ++current_address; 
+          }
+          
+        break;
+      
+    
+    case 0x10: // read postdecrement
+          if( is_locked ) return;
+          // If i suppose right, we should be giving out data until we have been unselected
+          while( digitalRead(SELECT_PIN) ) {
+            byte current_byte = pgm_read_byte(cart_image[current_address]);
+            do_send_byte(current_byte);
+            --current_address;
+          }
+      break;
+      
+    case 0xE0: // write postdecrement
+        if( is_locked ) return;
+    case 0x20: // erase postdecrement
+        if( current_address == 0xFFFF || current_command == 0xE0 ) {
+             while( digitalRead(SELECT_PIN) ) {
+                 byte current_byte = do_get_byte();
+                 // TODO: actual write
+                 --current_address; 
+              }
+        }
+        // the 0x20 command is ignored if address is not FFFFh, tho.
+        break;
+        
+    case 0x80: // Lock
+        // Well you asked for it
+        is_locked = true;
+        break;
+        
+    case 0x90: // Unlock
+        if( ! is_locked ) return; // Ignore attempts to unlock if not locked
+        if( current_address == 0x0000 ) {
+          // Unlocking basically takes 7 bytes of data input, and if they match bytes at 0000h...0007h
+          while( digitalRead(SELECT_PIN) && current_address <= 0x0007 ) {
+            byte current_byte = do_get_byte();
+            byte reference_byte = pgm_read_byte(cart_image[current_address]);
+            if ( current_byte != reference_byte ) {
+              return; // if password won't match, why bother processing further?
+            } 
+            ++current_address;
+          }
+          // OK so we've made it up to here without mismatching a single byte in the password
+          if ( digitalRead(SELECT_PIN) ) {
+            // Let's not unlock if password entry was just canceled right :p
+            is_locked = false; 
+          }
+        }
+        break;
 
-    // TODO: implement more commands!
     
     default: // unknown command
       break;
