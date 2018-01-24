@@ -104,7 +104,7 @@ void recvCommand() {
   if( (current_command & 0x0F) != 0x0 ) return; 
   // Filter invalid commands
   if ( (current_command > 0x20 && current_command < 0x80) || (current_command > 0xE0) ) return; 
-
+  
   // Now accept the data
   switch(current_command) {
     
@@ -205,41 +205,11 @@ void recvCommand() {
   }
 }
 
-void wake_me_up_inside() {
-  // this happens once the device is awake (SELECT is LOW)
-   // just go ahead and do what it wants from us
-  recvCommand();
-  // and then go to sleep again
-  sleep_now();
-}
 
-void sleep_now() {
-    // Configure power saving
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  sleep_enable(); // enable sleep in MCUCR register
-  byte interrupt_no = 0;
-#if SELECT_PIN == 2
-    interrupt_no = 0; // pin 2, interrupt 0
-#elif SELECT_PIN == 3
-    interrupt_no = 1;
-#else
-    #error SELECT can only be pin 2 or 3.
-#endif
-    // SELECT pin acts as a wake up pin, when it goes LOW (see time diagrams at http://www.pisi.com.pl/piotr433/mk90cahe.htm )
-  attachInterrupt(interrupt_no, wake_me_up_inside, LOW); 
 
-  sleep_mode();            // here the device is actually put to sleep!!
-                             // THE PROGRAM CONTINUES FROM HERE AFTER WAKING UP
- 
- sleep_disable();         // first thing after waking from sleep:
-                             // disable sleep...
-  detachInterrupt(0);      // disables interrupt 0 on pin 2 so the
-                             // wake up code will not be executed
-                             // during normal running time.
-}
 
 void setup() {
-
+  pinMode(13, OUTPUT);
   
   // SELECT pin always listens
   pinMode(SELECT_PIN, INPUT);
@@ -250,8 +220,16 @@ void setup() {
 }
 
 void loop() {
-  // nothing to do here, really
-  delayMicroseconds(1000);
+   digitalWrite(13, LOW);
+   
+  while(digitalRead(SELECT_PIN)) 
+    delayMicroseconds(1000); // wait until SELECT is low
+    
+  digitalWrite(13, HIGH);
+  recvCommand();
+  
+  while(!digitalRead(SELECT_PIN))
+    delayMicroseconds(1000); // wait until SELECT is back high
 }
 
 #include "test.h" // this needs to be on the bottom, to avoid code entering the Far address space
