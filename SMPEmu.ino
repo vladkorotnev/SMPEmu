@@ -81,14 +81,14 @@ void do_send_byte(byte toSend) {
   for(int i=0; i<8; i++) {
     // Sending 8 times
     do_wait_clock_fall();
-    // shift right 1 bit
-    current_byte = current_byte >> 1;
     // set output high if last bit is 1
-    if( (current_byte & 0x1) > 0x0 ) 
+    if( (current_byte & 0x80) > 0x0 )
       digitalWrite(DATA_PIN, HIGH);
     else
       digitalWrite(DATA_PIN, LOW);
 
+    // shift left 1 bit
+    current_byte = current_byte << 1;
     do_wait_clock_rise();
       
   }
