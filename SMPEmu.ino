@@ -134,7 +134,7 @@ void recvCommand() {
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
           while( !digitalRead(SELECT_PIN) ) {
-            byte current_byte = pgm_read_byte(cart_image[current_address]);
+            byte current_byte = pgm_read_byte(cart_image + current_address);
             do_send_byte(current_byte);
             ++current_address;
           }
@@ -155,7 +155,7 @@ void recvCommand() {
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
           while( !digitalRead(SELECT_PIN) ) {
-            byte current_byte = pgm_read_byte(cart_image[current_address]);
+            byte current_byte = pgm_read_byte(cart_image +current_address);
             do_send_byte(current_byte);
             --current_address;
           }
