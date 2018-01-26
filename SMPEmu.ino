@@ -100,16 +100,11 @@ extern const unsigned char cart_image[];
 void recvCommand() {
   // Read command
   current_command = do_get_byte();
-  // Lower 4 bits of opcode should be zero
-  if( (current_command & 0x0F) != 0x0 ) return; 
-  // Filter invalid commands
-  if ( (current_command > 0x20 && current_command < 0x80) || (current_command > 0xE0) ) return; 
-  
   // Now accept the data
   switch(current_command) {
     
     case 0x00: // query status
-      // TODO: Implement password errors counter
+      // TODO: Implement password errors counter?
       do_send_byte( is_locked ? 0x01 : 0x00 );
       break;
     
@@ -198,6 +193,30 @@ void recvCommand() {
           }
         }
         break;
+    
+    // ---------------------------------------
+    // Genjitsu SMP Commandset Extensions 0.2
+    // ---------------------------------------    
+    case 0xF0: // List files
+      {
+        // TODO: build a string of file names and send them
+         do_send_byte(0xFF); 
+      }
+      break;
+      
+    case 0xF1: // Mount image
+      {
+        // TODO: receive file name 
+      }
+      break;
+    
+    case 0xF2:
+     {
+     
+     }
+     break;  
+     
+    
 
     
     default: // unknown command
