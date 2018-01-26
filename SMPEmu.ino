@@ -242,4 +242,4 @@ void loop() {
   recvCommand();
 }
 
-#include "test.h" // this needs to be on the bottom, to avoid code entering the Far address space
+#include "pdpboot.h" // this needs to be on the bottom, to avoid code entering the Far address space

@@ -157,6 +157,7 @@ cont:
 	mov #0, r0 ; SMP0
 	call EMULS
 	;CALL TNYDLY
+	mov #0, r0 ; SMP0
 	call EMULS
 	; Print the List, stopping each 5 rows
 	mov #varArray, r1
@@ -197,6 +198,7 @@ doneprntn:
 	mov #varArray, r4
 	call INSTR
 
+	mov #0, r0 ; SMP0
 	mov #varArray, r3
 	call EMUSEL
 
