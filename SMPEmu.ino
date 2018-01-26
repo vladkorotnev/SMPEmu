@@ -81,14 +81,14 @@ void do_send_byte(byte toSend) {
   for(int i=0; i<8; i++) {
     // Sending 8 times
     do_wait_clock_fall();
-    // shift right 1 bit
-    current_byte = current_byte >> 1;
     // set output high if last bit is 1
-    if( (current_byte & 0x1) > 0x0 ) 
+    if( (current_byte & 0x80) > 0x0 )
       digitalWrite(DATA_PIN, HIGH);
     else
       digitalWrite(DATA_PIN, LOW);
 
+    // shift left 1 bit
+    current_byte = current_byte << 1;
     do_wait_clock_rise();
       
   }
@@ -133,7 +133,7 @@ void recvCommand() {
     case 0xD0: // read postincrement
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
-          while( digitalRead(SELECT_PIN) ) {
+          while( !digitalRead(SELECT_PIN) ) {
             byte current_byte = pgm_read_byte(cart_image[current_address]);
             do_send_byte(current_byte);
             ++current_address;
@@ -142,7 +142,7 @@ void recvCommand() {
       
      case 0xC0: // write postincrement
           if(is_locked) return;
-          while( digitalRead(SELECT_PIN) ) {
+          while( !digitalRead(SELECT_PIN) ) {
            byte current_byte = do_get_byte();
            // TODO: actual write
            ++current_address; 
@@ -154,7 +154,7 @@ void recvCommand() {
     case 0x10: // read postdecrement
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
-          while( digitalRead(SELECT_PIN) ) {
+          while( !digitalRead(SELECT_PIN) ) {
             byte current_byte = pgm_read_byte(cart_image[current_address]);
             do_send_byte(current_byte);
             --current_address;
@@ -165,7 +165,7 @@ void recvCommand() {
         if( is_locked ) return;
     case 0x20: // erase postdecrement
         if( current_address == 0xFFFF || current_command == 0xE0 ) {
-             while( digitalRead(SELECT_PIN) ) {
+             while( !digitalRead(SELECT_PIN) ) {
                  byte current_byte = do_get_byte();
                  // TODO: actual write
                  --current_address; 
@@ -183,7 +183,7 @@ void recvCommand() {
         if( ! is_locked ) return; // Ignore attempts to unlock if not locked
         if( current_address == 0x0000 ) {
           // Unlocking basically takes 7 bytes of data input, and if they match bytes at 0000h...0007h
-          while( digitalRead(SELECT_PIN) && current_address <= 0x0007 ) {
+          while( !digitalRead(SELECT_PIN) && current_address <= 0x0007 ) {
             byte current_byte = do_get_byte();
             byte reference_byte = pgm_read_byte(cart_image[current_address]);
             if ( current_byte != reference_byte ) {
@@ -192,7 +192,7 @@ void recvCommand() {
             ++current_address;
           }
           // OK so we've made it up to here without mismatching a single byte in the password
-          if ( digitalRead(SELECT_PIN) ) {
+          if ( !digitalRead(SELECT_PIN) ) {
             // Let's not unlock if password entry was just canceled right :p
             is_locked = false; 
           }
@@ -220,16 +220,7 @@ void setup() {
 }
 
 void loop() {
-   digitalWrite(13, LOW);
-   
-  while(digitalRead(SELECT_PIN)) 
-    delayMicroseconds(1000); // wait until SELECT is low
-    
-  digitalWrite(13, HIGH);
   recvCommand();
-  
-  while(!digitalRead(SELECT_PIN))
-    delayMicroseconds(1000); // wait until SELECT is back high
 }
 
 #include "test.h" // this needs to be on the bottom, to avoid code entering the Far address space
