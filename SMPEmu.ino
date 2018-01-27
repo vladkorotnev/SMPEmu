@@ -1,24 +1,20 @@
 // Elektronika SMP emulator
 // by Genjitsu Labs, 2018
-// version 0.0.1
+// version 0.0.2
 
 #include <avr/pgmspace.h>
 #include <avr/sleep.h>
-
-#define SELECT_PIN 3 /* NB: can only be pin 2 or 3 */
-#define CLOCK_PIN 4
-#define DATA_PIN 5
 
 /* Connect as follows:
  *  (see http://www.pisi.com.pl/piotr433/mk90cahe.htm for reference)
  *  
  *  Pin 2 Vcc of calculator into +5V of Arduino (when PC not connected to arduino!)
- *  Pin 3 CLK of calculator into CLOCK_PIN defined above via R=270 Ohm 
- *  Pin 4 DAT of calculator into DATA_PIN  defined above via R=270 Ohm
- *                                                      ^^^^^^^ this helps in case there is a time when the calculator is listening but
- *                                                      arduino is still in input mode, otherwise there is a risk of high current thru
- *                                                      the ICs and it can burn your computer or arduino
- *  Pin 5 SEL of calculator into pin 2 or 3 of Arduino (see SELECT_PIN above!!!)
+ *  Pin 3 CLK of calculator into pin 4 via R=220 Ohm 
+ *  Pin 4 DAT of calculator into pin 5 via R=270 Ohm
+ *                                         ^^^^^^^ this helps in case there is a time when the calculator is listening but
+ *                                         arduino is still in input mode, otherwise there is a risk of high current thru
+ *                                         the ICs and it can burn your computer or arduino
+ *  Pin 5 SEL of calculator into pin 3 of Arduino 
  *  Pin 6 GND of calculator into GND of Arduino
  */
 
@@ -39,57 +35,53 @@ byte current_command = 0x0;
  *  0xE0  Write postdecrement (unused in MK90)
  */
 
-void do_wait_clock_fall() {
-  while( digitalRead(CLOCK_PIN) ) {  
-      // while clock is high, waiting
-      delayMicroseconds(5); // NB: Maybe remove?
-    }
-}
-
-void do_wait_clock_rise() {
-  while( !digitalRead(CLOCK_PIN) ) {  
-      // while clock is high, waiting
-      delayMicroseconds(5); // NB: Maybe remove?
-    }
-}
+#define WAIT_CLOCK_FALL  while( (PIND & B00010000) != 0x0 )
+#define WAIT_CLOCK_RISE  while( (PIND & B00010000) == 0x0 )
+#define IS_SELECTED     ( (PIND & B00001000) == 0x0 )
+#define IS_NOT_SELECTED ( (PIND & B00001000) != 0x0 )
 
 // Read a byte from input
 byte do_get_byte() {
-  pinMode(DATA_PIN, INPUT);
+  // Switch DATA pin 5 to INPUT
+  DDRD = B11000111;
+  
   byte current_byte = 0x0;
   // Data written to the cartridge change at rising edges of the CLOCK pulses, and are shifted-in on falling edges of the CLOCK pulses beginning with the most significant bit. 
   for(int i=0;i<8;i++) {
     // Reading 8 times
 
-    do_wait_clock_fall();
+    WAIT_CLOCK_FALL;
     
     // shift left 1 bit
     current_byte = current_byte << 1;
-    if( digitalRead(DATA_PIN) ) 
+    if( (PIND & B00100000) > 0x0 ) 
       current_byte += 1; // set last bit to 1 if DATA high
 
-    do_wait_clock_rise();
+    WAIT_CLOCK_RISE;
   }
   return current_byte;
 }
 
 // Send a byte to data pin
 void do_send_byte(byte toSend) {
-  pinMode(DATA_PIN, OUTPUT);
+  // Switch DATA pin 5 to OUTPUT
+  DDRD = B11100111;
+  
   byte current_byte = toSend;
   // Data read from the cartridge change at falling edges of the CLOCK pulses, and are sampled at rising edges of the CLOCK pulses.
   for(int i=0; i<8; i++) {
     // Sending 8 times
-    do_wait_clock_fall();
+    WAIT_CLOCK_FALL;
+    
     // set output high if last bit is 1
     if( (current_byte & 0x80) > 0x0 )
-      digitalWrite(DATA_PIN, HIGH);
+      PORTD |= B00100000;
     else
-      digitalWrite(DATA_PIN, LOW);
+      PORTD &= B11011111; 
 
     // shift left 1 bit
     current_byte = current_byte << 1;
-    do_wait_clock_rise();
+    WAIT_CLOCK_RISE;
       
   }
 }
@@ -128,7 +120,7 @@ void recvCommand() {
     case 0xD0: // read postincrement
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
-          while( !digitalRead(SELECT_PIN) ) {
+          while( IS_SELECTED ) {
             byte current_byte = pgm_read_byte(cart_image + current_address);
             do_send_byte(current_byte);
             ++current_address;
@@ -137,7 +129,7 @@ void recvCommand() {
       
      case 0xC0: // write postincrement
           if(is_locked) return;
-          while( !digitalRead(SELECT_PIN) ) {
+          while( IS_SELECTED ) {
            byte current_byte = do_get_byte();
            // TODO: actual write
            ++current_address; 
@@ -149,7 +141,7 @@ void recvCommand() {
     case 0x10: // read postdecrement
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
-          while( !digitalRead(SELECT_PIN) ) {
+          while( IS_SELECTED ) {
             byte current_byte = pgm_read_byte(cart_image +current_address);
             do_send_byte(current_byte);
             --current_address;
@@ -160,7 +152,7 @@ void recvCommand() {
         if( is_locked ) return;
     case 0x20: // erase postdecrement
         if( current_address == 0xFFFF || current_command == 0xE0 ) {
-             while( !digitalRead(SELECT_PIN) ) {
+             while( IS_SELECTED ) {
                  byte current_byte = do_get_byte();
                  // TODO: actual write
                  --current_address; 
@@ -178,7 +170,7 @@ void recvCommand() {
         if( ! is_locked ) return; // Ignore attempts to unlock if not locked
         if( current_address == 0x0000 ) {
           // Unlocking basically takes 7 bytes of data input, and if they match bytes at 0000h...0007h
-          while( !digitalRead(SELECT_PIN) && current_address <= 0x0007 ) {
+          while( IS_SELECTED && current_address <= 0x0007 ) {
             byte current_byte = do_get_byte();
             byte reference_byte = pgm_read_byte(cart_image[current_address]);
             if ( current_byte != reference_byte ) {
@@ -187,7 +179,7 @@ void recvCommand() {
             ++current_address;
           }
           // OK so we've made it up to here without mismatching a single byte in the password
-          if ( !digitalRead(SELECT_PIN) ) {
+          if ( IS_SELECTED ) {
             // Let's not unlock if password entry was just canceled right :p
             is_locked = false; 
           }
@@ -200,6 +192,11 @@ void recvCommand() {
     case 0xF0: // List files
       {
         // TODO: build a string of file names and send them
+         do_send_byte('T');
+         do_send_byte('O');
+         do_send_byte('D');
+         do_send_byte('O');
+         do_send_byte(0x0);
          do_send_byte(0xFF); 
       }
       break;
@@ -230,12 +227,15 @@ void recvCommand() {
 void setup() {
   pinMode(13, OUTPUT);
   
-  // SELECT pin always listens
-  pinMode(SELECT_PIN, INPUT);
-  // So does the CLOCK, as the calculator is the clock master
-  pinMode(CLOCK_PIN, INPUT);
-  // DATA pin listen by default
-  pinMode(DATA_PIN, INPUT);
+  // SELECT pin 3 always listens
+  // So does the CLOCK 4, as the calculator is the clock master
+  // DATA pin 5 listen by default
+  PORTD = B11111111;
+  DDRD = B11000111;
+  
+  // remove interrupts
+  cli();
+  
 }
 
 void loop() {
