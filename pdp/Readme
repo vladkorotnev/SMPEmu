@@ -1,0 +1,33 @@
+PDP side firmware for the SMPEmu flash cart.
+
+Genjitsu SMP Protocol Extension version 0.2:
+
+	This protocol extension defines the following commands for the MK90 SMP bus.
+	Within this extension's command pool, which is 0xF0 ~ 0xFF, the lower 4 bits are, unlike the original manufacturers' specs, NOT "don't care".
+
+	Commands are as follows:
+
+		Command 0xF0 — list files in card
+		Returns:
+			Array of file names, not more than [8].[3]; null-terminated strings of 4~12 bytes (terminator excluded). 
+			The array is finalized with 0xFF. 
+
+		Command 0xF1 - select file to emulate
+		Does:
+			If the file exists, mounts it as the emulated storage.
+			If the file doesn't exist, creates a 10KB file, then mounts it.
+		Accepts:
+			Null-terminated file name, not more than [8].[3].
+		Returns:
+			nothing
+			don't even try
+			just why
+			no
+
+		Command 0xF2 — optional, stop emulation (reserved in case I find a way to replace BASIC commands)
+		Does:
+			Unmount the mounted image, flushing the remaining buffer into the storage.
+		Accepts:
+			nothing
+		Returns:
+			also nothing

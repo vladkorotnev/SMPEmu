@@ -1,0 +1,246 @@
+	; MK90 flash cartridge bootrom for basic v1.0
+	; by Akasaka / Genjitsu Labs, 2018
+
+	.ENABL AMA 	; Absolute addressing
+	.ASECT		; Absolute section
+	.= 0		; Beginning of cartridge
+	NOP 		; Obligatory!
+
+
+	; -------------------------------------
+	;  b o o t s t r a p
+	; -------------------------------------
+
+	jmp start		; Kickstart the loader
+
+	;	----------------------------------
+	;	 OS Procedures and Vars
+	;	----------------------------------
+
+	PRINTATTRS = 34072
+	PRINTNUM = 153360 ; arg. r3
+	PRINT = 153414 ; arg. r1
+	INITRAM = 153700
+	INITTTY = 120536
+	LCDINA = 164000
+	LCDINB = 164002
+	WAITCOMM = 174506
+	SMPCMD = 164026
+	SMPBAUD = 164022
+	SMPCS = 164024
+	SMPIO = 164020
+	GETCH = 131120
+	PUTCH = 116542
+
+
+	; -------------------------------
+	; 	Commands to control the EMU 
+	; -------------------------------
+
+EMULS:
+	; List the files on the EMU SD
+	mov	#11,@#SMPBAUD ; CONST: transfer rate
+	mov	#SMPCS,r1	 ; CONST: control/status register
+	mov	#WAITCOMM,r2	 ; CONST: procedure 'wait for the transfer completed'
+
+	; Select SMP address
+	bis	#10,r5		; writing to the SMP
+	mov	r5,(r1)
+	mov	#360,@#SMPCMD	;cmd: 0xF0 List Files In Card
+	jsr	pc,(r2)
+	
+	bic	#10,r5		; cmd: reading from the SMP
+	mov	r5,(r1)
+	jsr	pc,(r2)
+
+	mov #varArray, r3
+lsloop:
+	movb @#SMPIO, (r3)
+	jsr pc, (r2)
+	movb (r3), r4
+	cmpb r4, #377 ; check if last one 0xFF
+	bhis lsdone ; and go out
+	inc r3	; otherwise increment address 
+    br lsloop ; and go on
+lsdone: 
+	rts pc ; END EMULS
+
+EMUSEL:
+	; Set the emulated file name - zero terminated in r3
+	mov	#11,@#SMPBAUD ; CONST: transfer rate
+	mov	#SMPCS,r1	 ; CONST: control/status register
+	mov	#WAITCOMM,r2	 ; CONST: procedure 'wait for the transfer completed'
+
+	bis	#10,r5		; writing to the SMP
+	mov	r5,(r1)
+	mov	#361,@#SMPCMD	;cmd: 0xF1 Select File Name
+	jsr	pc,(r2)
+
+	; Write everything at r3 until 0x00 (inclusing 0x00)
+selloop:
+	movb (r3), @#SMPIO
+	jsr	pc,(r2)
+	tst (r3)
+	beq seldone
+	inc r3
+	br selloop
+seldone:
+	rts pc ; END EMUSEL
+
+
+
+	; ---------------------------
+	;  P r o c e d u r e s 
+	; ---------------------------
+
+INSTR: ; arg r.4 — input buffer
+
+waitkey:	
+	jsr	pc,@#GETCH	;wait for a key
+	jsr	pc,@#PUTCH	;display character r2
+	movb	r2,(r4)+
+	cmp #15, r2
+	bne waitkey
+	dec r4 ; no need to save a 0x0d :p
+	movb #0, (r4)
+	rts pc
+
+TNYDLY:
+	mov #133000, r0
+waiting:	
+	sub	#1,r0
+	bne	waiting
+	rts pc
+
+
+	; ----------------------------
+	;    M  a  i  n
+	; ----------------------------
+start:
+	mov sp, 27476   ; Move stack to nearly end of RAM
+	
+	call @#INITRAM	; OS initialisation
+	call @#120536
+
+	; LCD controller initialisation
+	mov	34022,@#LCDINA
+	mov	#104306,@#LCDINB
+
+	; Print the Title
+	bis #21, @#PRINTATTRS	; black background
+
+	mov #0, @#34044
+	mov #1, @#33726 ; it won't print at all at Y=0 WTF???
+
+	jmp cont
+
+	; -----------------------------------------------------
+	;	Oops, somebody punched a hole in the MAIN
+	;   to give this tiny interrupt vector a home without
+	;	extending the FW beyond the bootstrapped 500 bytes
+	; -----------------------------------------------------
+
+	.= 310 ; Location of KBCU IV
+	.word	130514, 0000	
+
+	; ----------------------------
+	;    M  a  i  n - continued
+	; ----------------------------
+
+cont:
+	mov #cartTitle, r1
+	call @#PRINT
+
+	bic #21, @#PRINTATTRS
+
+	; Retrieve array of file names
+	mov #0, r0 ; SMP0
+	call EMULS
+	;CALL TNYDLY
+	mov #0, r0 ; SMP0
+	call EMULS
+	; Print the List, stopping each 5 rows
+	mov #varArray, r1
+	mov #7, r3
+prntlist:
+	movb (r1), r4
+	cmpb  r4, #377
+	bhis doneprntn
+
+	CALL @#PRINT
+
+	dec r3
+	beq prntmoar
+	br prntcrlf
+prntmoar:
+	mov r1, -(SP)
+	mov #cartMoar, r1
+	CALL @#PRINT
+	CALL @#GETCH
+	mov (SP)+, r1
+	mov #7, r3
+prntcrlf:
+	mov r1, -(SP)
+	mov #cartCrlf, r1
+	CALL @#PRINT
+	mov (SP)+, r1
+	br prntlist
+doneprntn:
+	mov r1, -(SP)
+	mov #cartCrlf, r1
+	CALL @#PRINT
+	mov (SP)+, r1
+	CALL TNYDLY
+	; let the user input file name
+	mov #cartMsgFilename, r1
+	call @#PRINT
+	
+	mov #varArray, r4
+	call INSTR
+
+	mov #0, r0 ; SMP0
+	mov #varArray, r3
+	call EMUSEL
+
+	mov #cartCrlf, r1
+	CALL @#PRINT
+
+	mov #cartRst, r1
+	call @#PRINT
+	CALL TNYDLY
+
+	jmp @#173000 ; Reboot!
+	
+end: 
+	wait
+	br end
+
+cartTitle:
+	.ascii "  Genjitsu"
+	.byte 16 ; 16o start russ
+	.ascii " smp 0.2  "
+	.byte 17 ; 17o end russ
+	.byte 0
+cartMoar:
+	.ascii "^"
+	.byte 15, 0
+cartCrlf:
+	.byte 12,15,0
+cartMsgFilename:
+	.byte 16
+	.ascii "iMQ SU]ESTWU@]EGO / NOWOGO FAJLA?"
+	.byte 17,12,15,0
+cartRst:
+	.byte 16
+	.ascii "pEREZAGRUVA@SX!!!"
+	.byte 17,0
+
+	.= 1000
+
+	; -------------------- 
+	; !! END OF BOOTLOADER !!
+	;  Further data after 1000o  would need to be read manually !
+	; --------------------
+
+	varArray = 32000
+	
