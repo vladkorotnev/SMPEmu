@@ -23,8 +23,10 @@
  *      MISO - pin 12
  *      CLK - pin 13
  */
+ 
 SdFat SD;
 #define SD_CS_PIN SS
+#define SPI_SPEED SD_SCK_MHZ(50)
 
 File current_mounted;
 boolean did_mount = false;
@@ -276,7 +278,7 @@ void recvCommand() {
 void setup() {
   pinMode(13, OUTPUT);
 
-  if( !SD.begin(SD_CS_PIN) ) {
+  if( !SD.begin(SD_CS_PIN, SPI_SPEED) ) {
     str_buf = F("SD Initialization Failed");
   } else {
     File root = SD.open("/");
