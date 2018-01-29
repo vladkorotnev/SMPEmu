@@ -26,9 +26,11 @@
 SdFat SD;
 #define SD_CS_PIN SS
 
+File current_mounted;
+boolean did_mount = false;
 word current_address = 0x0; // 1-word address register of the SMP
 boolean is_locked = false; // when the cartridge is locked, r/w instructions are ignored
-
+String str_buf;
 byte current_command = 0x0; 
 /* Allowed commands:
  *  0x00  Read status
@@ -234,6 +236,23 @@ void recvCommand() {
 
 void setup() {
   pinMode(13, OUTPUT);
+
+  if( !SD.begin(SD_CS_PIN) ) {
+    str_buf = F("SD Initialization Failed");
+  } else {
+    File root = SD.open("/");
+    while (true) {
+      File entry =  root.openNextFile();
+      if (! entry) {
+        // no more files
+        break;
+      }
+      if (!entry.isDirectory()) {
+        str_buf = str_buf + entry.name() + "\x00";
+      } 
+      entry.close();
+    }
+  }
   
   // SELECT pin 3 always listens
   // So does the CLOCK 4, as the calculator is the clock master
