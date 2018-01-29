@@ -22,10 +22,11 @@
  *      MOSI - pin 11
  *      MISO - pin 12
  *      CLK - pin 13
+ *      CS - pin 10
  */
  
 SdFat SD;
-#define SD_CS_PIN SS
+#define SD_CS_PIN 10
 #define SPI_SPEED SD_SCK_MHZ(50)
 
 File current_mounted;
