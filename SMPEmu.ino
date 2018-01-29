@@ -1,7 +1,9 @@
 // Elektronika SMP emulator
 // by Genjitsu Labs, 2018
-// version 0.0.2
+// version 1.0.0
 
+#include <SPI.h>
+#include <SdFat.h>
 #include <avr/pgmspace.h>
 #include <avr/sleep.h>
 
@@ -16,7 +18,13 @@
  *                                         the ICs and it can burn your computer or arduino
  *  Pin 5 SEL of calculator into pin 3 of Arduino 
  *  Pin 6 GND of calculator into GND of Arduino
+ *   * SD card attached to SPI bus as follows:
+ *      MOSI - pin 11
+ *      MISO - pin 12
+ *      CLK - pin 13
  */
+SdFat SD;
+#define SD_CS_PIN SS
 
 word current_address = 0x0; // 1-word address register of the SMP
 boolean is_locked = false; // when the cartridge is locked, r/w instructions are ignored
