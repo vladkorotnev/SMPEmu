@@ -115,6 +115,7 @@ void recvCommand() {
           byte hi = do_get_byte(); 
          byte lo = do_get_byte();
          current_address = (hi << 8) + lo;
+         current_mounted.seek(current_address);
         }
       break;
 
@@ -131,9 +132,14 @@ void recvCommand() {
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
           while( IS_SELECTED ) {
-            byte current_byte = pgm_read_byte(cart_image + current_address);
+            byte current_byte;
+            if(!did_mount)
+              current_byte = pgm_read_byte(cart_image + current_address);
+            else 
+              current_byte = current_mounted.read();
             do_send_byte(current_byte);
             ++current_address;
+            if ( did_mount ) current_mounted.seek(current_address);
           }
       break;
       
@@ -141,8 +147,11 @@ void recvCommand() {
           if(is_locked) return;
           while( IS_SELECTED ) {
            byte current_byte = do_get_byte();
-           // TODO: actual write
+           if( did_mount ) {
+            current_mounted.write(current_byte);
+           }
            ++current_address; 
+           if ( did_mount ) current_mounted.seek(current_address);
           }
           
         break;
@@ -152,9 +161,14 @@ void recvCommand() {
           if( is_locked ) return;
           // If i suppose right, we should be giving out data until we have been unselected
           while( IS_SELECTED ) {
-            byte current_byte = pgm_read_byte(cart_image +current_address);
+            byte current_byte;
+            if(!did_mount) 
+              current_byte = pgm_read_byte(cart_image + current_address);
+             else
+              current_byte = current_mounted.read();
             do_send_byte(current_byte);
             --current_address;
+            if ( did_mount )  current_mounted.seek(current_address);
           }
       break;
       
@@ -164,8 +178,11 @@ void recvCommand() {
         if( current_address == 0xFFFF || current_command == 0xE0 ) {
              while( IS_SELECTED ) {
                  byte current_byte = do_get_byte();
-                 // TODO: actual write
+                 if ( did_mount ) {
+                   current_mounted.write(current_byte);
+                 }
                  --current_address; 
+                  if ( did_mount )  current_mounted.seek(current_address);
               }
         }
         // the 0x20 command is ignored if address is not FFFFh, tho.
@@ -182,7 +199,7 @@ void recvCommand() {
           // Unlocking basically takes 7 bytes of data input, and if they match bytes at 0000h...0007h
           while( IS_SELECTED && current_address <= 0x0007 ) {
             byte current_byte = do_get_byte();
-            byte reference_byte = pgm_read_byte(cart_image[current_address]);
+            byte reference_byte = pgm_read_byte(cart_image + current_address);
             if ( current_byte != reference_byte ) {
               return; // if password won't match, why bother processing further?
             } 
@@ -201,19 +218,43 @@ void recvCommand() {
     // ---------------------------------------    
     case 0xF0: // List files
       {
-        // TODO: build a string of file names and send them
-         do_send_byte('T');
-         do_send_byte('O');
-         do_send_byte('D');
-         do_send_byte('O');
-         do_send_byte(0x0);
-         do_send_byte(0xFF); 
+        // send array of strings
+         for(int i = 0; i < str_buf.length(); i++ ) {
+           if( IS_NOT_SELECTED ) break; // canceled
+           do_send_byte(str_buf[i]);
+         }
+         do_send_byte(0x00);
+         do_send_byte(0xFF);
       }
       break;
       
     case 0xF1: // Mount image
       {
-        // TODO: receive file name 
+        // Receive a file name 
+         char fileName[] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+         byte fnIterator = 0;
+         byte nameByte = 0;
+         
+        while( IS_SELECTED ) {
+          nameByte = do_get_byte();
+          fileName[fnIterator] = nameByte;
+          ++fnIterator;
+          
+          if ( fnIterator > 12 || nameByte == 0x0 ) {
+            // null-terminator or end of name
+            break;
+          }
+        }
+        if( IS_NOT_SELECTED ) return; // canceled
+        
+        if( did_mount ) { // unmount current file
+          current_mounted.close();
+          did_mount = false;
+        }
+        if( SD.exists(fileName) ) {
+          current_mounted = SD.open(fileName, FILE_WRITE); 
+          did_mount = true;
+        }
       }
       break;
     
@@ -223,8 +264,6 @@ void recvCommand() {
      }
      break;  
      
-    
-
     
     default: // unknown command
       break;
