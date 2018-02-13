@@ -168,9 +168,6 @@ cont:
 	; Retrieve array of file names
 	mov #0, r0 ; SMP0
 	call EMULS
-	;CALL TNYDLY
-	mov #0, r0 ; SMP0
-	call EMULS
 	; Print the List, stopping each 5 rows
 	mov #varArray, r1
 	mov #7, r3
