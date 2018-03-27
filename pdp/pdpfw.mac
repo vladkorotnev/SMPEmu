@@ -105,7 +105,7 @@ INSTR: ; arg r.4 — input buffer
 	; Channel 2 is used by the keyboard controller КА1835ВГ1.
 
 	; switch the serial mux to KBCU
-	mov #142, @#SMPCS ; channel 2, interrupts only to 00C8, slave mode
+	mov #1000, @#SMPBAUD
 
 waitkey:	
 	jsr	pc,@#GETCH	;wait for a key
