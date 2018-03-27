@@ -95,6 +95,18 @@ seldone:
 
 INSTR: ; arg r.4 — input buffer
 
+	; bits 2-0 select the serial channel
+	; bit 3 specifies the transfer direction: 0=input, 1=output
+	; Setting the transfer direction to input causes a byte to be read from the serial bus to the shift register.
+	; cleared bit 4 enables external interrupts (i.e. CLK signal in the slave mode) to the vector $00C8, lowest priority
+	; ...
+	; bit 7 selects the transfer mode (i.e. which device drives the CLK line): 0=slave, 1=master
+	
+	; Channel 2 is used by the keyboard controller КА1835ВГ1.
+
+	; switch the serial mux to KBCU
+	mov #1000, @#SMPBAUD
+
 waitkey:	
 	jsr	pc,@#GETCH	;wait for a key
 	jsr	pc,@#PUTCH	;display character r2
@@ -229,7 +241,7 @@ cartMsgFilename:
 	.byte 17,12,15,0
 cartRst:
 	.byte 16
-	.ascii "pEREZAGRUVA@SX!!!"
+	.ascii "pEREZAGRUVA@SX!"
 	.byte 17,0
 
 	.= 1000
