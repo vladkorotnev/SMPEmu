@@ -136,9 +136,6 @@ start:
 	; Print the Title
 	bis #21, @#PRINTATTRS	; black background
 
-	mov #0, @#34044
-	mov #1, @#33726 ; it won't print at all at Y=0 WTF???
-
 	jmp cont
 
 	; -----------------------------------------------------
@@ -155,6 +152,9 @@ start:
 	; ----------------------------
 
 cont:
+	mov #0, @#34044
+	mov #1, @#33726 ; it won't print at all at Y=0 WTF??
+
 	mov #cartTitle, r1
 	call @#PRINT
 
