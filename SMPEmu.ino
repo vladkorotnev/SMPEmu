@@ -84,6 +84,9 @@ void do_send_byte(byte toSend) {
     WAIT_CLOCK_RISE;
       
   }
+
+  // Switch DATA pin 5 back to INPUT (see issue #5)
+  DDRD = B11000111;
 }
 
 extern const unsigned char cart_image[];
