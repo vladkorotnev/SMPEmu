@@ -47,13 +47,13 @@ byte do_get_byte() {
   
   byte current_byte = 0x0;
   // Data written to the cartridge change at rising edges of the CLOCK pulses, and are shifted-in on falling edges of the CLOCK pulses beginning with the most significant bit. 
-  for(int i=0;i<8;i++) {
+  for(byte i=8; i!=0; --i) {
     // Reading 8 times
 
     WAIT_CLOCK_FALL;
     
     // shift left 1 bit
-    current_byte = current_byte << 1;
+    current_byte <<= 1;
     if( (PIND & B00100000) > 0x0 ) 
       current_byte += 1; // set last bit to 1 if DATA high
 
@@ -69,7 +69,7 @@ void do_send_byte(byte toSend) {
   
   byte current_byte = toSend;
   // Data read from the cartridge change at falling edges of the CLOCK pulses, and are sampled at rising edges of the CLOCK pulses.
-  for(int i=0; i<8; i++) {
+  for(byte i=8; i!=0; --i) {
     // Sending 8 times
     WAIT_CLOCK_FALL;
     
@@ -80,10 +80,13 @@ void do_send_byte(byte toSend) {
       PORTD &= B11011111; 
 
     // shift left 1 bit
-    current_byte = current_byte << 1;
+    current_byte <<= 1;
     WAIT_CLOCK_RISE;
       
   }
+
+  // Switch DATA pin 5 back to INPUT (see issue #5)
+  DDRD = B11000111;
 }
 
 extern const unsigned char cart_image[];
@@ -125,7 +128,7 @@ void recvCommand() {
             do_send_byte(current_byte);
             ++current_address;
           }
-      break;
+     break;
       
      case 0xC0: // write postincrement
           if(is_locked) return;
@@ -219,6 +222,8 @@ void recvCommand() {
     default: // unknown command
       break;
   }
+
+  while( IS_SELECTED ); // wait until SELECT line is untriggered, see issue #13
 }
 
 
