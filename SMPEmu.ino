@@ -222,6 +222,8 @@ void recvCommand() {
     default: // unknown command
       break;
   }
+
+  while( IS_SELECTED ); // wait until SELECT line is untriggered, see issue #13
 }
 
 
