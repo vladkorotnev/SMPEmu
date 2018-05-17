@@ -1,9 +1,10 @@
 // Elektronika SMP emulator
 // by Genjitsu Labs, 2018
-// version 0.0.2
+// version 0.1.0
 
 #include <avr/pgmspace.h>
 #include <avr/sleep.h>
+#include <avr/wdt.h>
 
 /* Connect as follows:
  *  (see http://www.pisi.com.pl/piotr433/mk90cahe.htm for reference)
@@ -93,6 +94,7 @@ extern const unsigned char cart_image[];
 
 // Gets executed when SELECT is pulled low
 void recvCommand() {
+ // digitalWrite(13,1);
   // Read command
   current_command = do_get_byte();
   // Now accept the data
@@ -237,14 +239,37 @@ void setup() {
   // DATA pin 5 listen by default
   PORTD = B11111111;
   DDRD = B11000111;
-  
-  // remove interrupts
-  cli();
-  
+
+    // disable ADC
+    ADCSRA = 0;
+    // disable WDT
+   wdt_disable();
+    // disable BOD
+    MCUCR = _BV (BODS) | _BV (BODSE);  // turn on brown-out enable select
+    MCUCR = _BV (BODS);        // this must be done within 4 clock cycles of above
+    
+    attachInterrupt(1, recvCommand, LOW);
+
 }
 
+void sleepNow() {
+  set_sleep_mode(SLEEP_MODE_ADC);
+  sleep_enable();
+      // disable BOD
+    MCUCR = _BV (BODS) | _BV (BODSE);  // turn on brown-out enable select
+    MCUCR = _BV (BODS);        // this must be done within 4 clock cycles of above
+  attachInterrupt(1, recvCommand, LOW);
+  //  digitalWrite(13,0);
+  sleep_mode();
+
+  // NOW AWAKE!!! And continuing execution from here
+  sleep_disable();
+  detachInterrupt(1);
+}
+
+
 void loop() {
-  recvCommand();
+  sleepNow(); // go straight to sleep
 }
 
 #include "pdpboot.h" // this needs to be on the bottom, to avoid code entering the Far address space
