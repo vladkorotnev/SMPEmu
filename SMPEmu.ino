@@ -44,15 +44,17 @@ byte current_command = 0x0;
 // Read a byte from input
 byte do_get_byte() {
   // Switch DATA pin 5 to INPUT
-  DDRD = B11000111;
+  DDRD &= B11011111;
   
   byte current_byte = 0x0;
   // Data written to the cartridge change at rising edges of the CLOCK pulses, and are shifted-in on falling edges of the CLOCK pulses beginning with the most significant bit. 
   for(byte i=8; i!=0; --i) {
     // Reading 8 times
 
-    WAIT_CLOCK_FALL;
-    
+    while( (PIND & B00010000) != 0x0 ) {
+      if ( IS_NOT_SELECTED ) return 0xFF;
+    }
+
     // shift left 1 bit
     current_byte <<= 1;
     if( (PIND & B00100000) > 0x0 ) 
@@ -66,7 +68,7 @@ byte do_get_byte() {
 // Send a byte to data pin
 void do_send_byte(byte toSend) {
   // Switch DATA pin 5 to OUTPUT
-  DDRD = B11100111;
+  DDRD |= B00100000;
   
   byte current_byte = toSend;
   // Data read from the cartridge change at falling edges of the CLOCK pulses, and are sampled at rising edges of the CLOCK pulses.
@@ -87,13 +89,14 @@ void do_send_byte(byte toSend) {
   }
 
   // Switch DATA pin 5 back to INPUT (see issue #5)
-  DDRD = B11000111;
+  DDRD &= B11011111;
 }
 
 extern const unsigned char cart_image[];
 
 // Gets executed when SELECT is pulled low
 void recvCommand() {
+  PORTB |= B00100000;  // LED on
  // digitalWrite(13,1);
   // Read command
   current_command = do_get_byte();
@@ -226,6 +229,7 @@ void recvCommand() {
   }
 
   while( IS_SELECTED ); // wait until SELECT line is untriggered, see issue #13
+  PORTB &= B11011111;  // LED off
 }
 
 
@@ -239,8 +243,14 @@ void setup() {
   // DATA pin 5 listen by default
   PORTD = B11111111;
   DDRD = B11000111;
+  DDRB = B00100000;  // LED on PB5
+  PORTB = B11011111;  // pull-ups on unused input pins
+  DDRC = B00000000;
+  PORTC = B11111111;  // pull-ups on unused input pins
 
-    // disable ADC
+   set_sleep_mode(SLEEP_MODE_ADC);
+   sleep_enable();
+   // disable ADC
     ADCSRA = 0;
     // disable WDT
    wdt_disable();
@@ -252,24 +262,8 @@ void setup() {
 
 }
 
-void sleepNow() {
-  set_sleep_mode(SLEEP_MODE_ADC);
-  sleep_enable();
-      // disable BOD
-    MCUCR = _BV (BODS) | _BV (BODSE);  // turn on brown-out enable select
-    MCUCR = _BV (BODS);        // this must be done within 4 clock cycles of above
-  attachInterrupt(1, recvCommand, LOW);
-  //  digitalWrite(13,0);
-  sleep_mode();
-
-  // NOW AWAKE!!! And continuing execution from here
-  sleep_disable();
-  detachInterrupt(1);
-}
-
-
 void loop() {
-  sleepNow(); // go straight to sleep
+    sleep_mode();
 }
 
 #include "pdpboot.h" // this needs to be on the bottom, to avoid code entering the Far address space
