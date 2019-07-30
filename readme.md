@@ -1,5 +1,19 @@
 # Genjitsu SMP
-## The flash cartridge for the Elektronika MK90 calculator
+## A flash cartridge for the Elektronika MK90 calculator
+
+-----
+
+## Project status
+
+Another user [azya52](https://github.com/azya52) has developed a fully working STM32-based alternative to this based off the same PDP-side menu. It also works as USB mass storage, eliminating pretty much any need for an SD card or anything. 
+
+Please check out their project instead: [azya52/STMP](https://github.com/azya52/STMP)
+
+In the light of this maybe I'll update the menu a bit sometime soon.
+
+Unfortunately my (public) github is becoming a mess of dead code and abandoned projects. 
+
+This is sad but it's how it is, hopefully not for long. Let's hope for that, at least.
 
 -----
 
