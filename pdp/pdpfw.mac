@@ -11,7 +11,7 @@
 	;  b o o t s t r a p
 	; -------------------------------------
 
-	jmp start		; Kickstart the loader
+	br start		; Kickstart the loader
 
 	;	----------------------------------
 	;	 OS Procedures and Vars
@@ -31,6 +31,7 @@
 	SMPIO = 164020
 	GETCH = 131120
 	PUTCH = 116542
+	DELCH = 120670
 
 
 	; -------------------------------
@@ -105,12 +106,22 @@ INSTR: ; INSTR - prompt a string from the user; arg r.4 — input buffer
 
 waitkey:	
 	jsr	pc,@#GETCH	;wait for a key
+	cmpb #40, r2 ; spec. char? (VK or ignore)
+	bgt isvk
+	cmpb #177, r2 ; ZB?
+	bne kdisp
+	cmp #varArray, r4 ; empty buf?
+	beq waitkey
+	clrb -(r4)
+	jsr	pc,@#DELCH
+	br waitkey
+kdisp:
 	jsr	pc,@#PUTCH	;display character r2
 	movb	r2,(r4)+
-	cmp #15, r2
+isvk:
+	cmpb #15, r2
 	bne waitkey
-	dec r4 ; no need to save a 0x0d :p
-	movb #0, (r4)
+	clrb (r4)
 	rts pc
 
 TNYDLY:
@@ -120,23 +131,20 @@ waiting:
 	bne	waiting
 	rts pc
 
+
 	; ----------------------------
 	;    M  a  i  n
 	; ----------------------------
 start:
-	mov sp, 27476   ; Move stack to nearly end of RAM
+	mov #27476, sp   ; Move stack to nearly end of RAM
 	
 	call @#INITRAM	; OS initialisation
 	call @#120536
 
 	; LCD controller initialisation
 	mov	34022,@#LCDINA
-	mov	#104306,@#LCDINB
-
-	; Print the Title
-	bis #21, @#PRINTATTRS	; black background
-
-	jmp cont
+	
+	br cont
 
 	; -----------------------------------------------------
 	;	Oops, somebody punched a hole in the MAIN
@@ -145,23 +153,34 @@ start:
 	; -----------------------------------------------------
 
 	.= 310 ; Location of KBCU IV
-	.word	130514, 0000	
+	.word	130514, 0
 
 	; ----------------------------
 	;    M  a  i  n - continued
 	; ----------------------------
 
 cont:
-	mov #0, @#34044
+	; LCD controller initialisation (cont.)
+	mov	#104306,@#LCDINB
+	
+	; Print the Title
+	bis #21, @#PRINTATTRS	; black background
+	
+	clr @#34044 ; X=0
 	mov #1, @#33726 ; it won't print at all at Y=0 WTF??
+	
+	sub #36,@#34022 ; print at Y=0 trick
 
 	mov #cartTitle, r1
 	call @#PRINT
+	
+	add #36,@#34022
+	dec @#33726
 
 	bic #21, @#PRINTATTRS
 
 	; Retrieve array of file names
-	mov #0, r0 ; SMP0
+	clr r0 ; SMP0
 	call EMULS
 	; Print the List, stopping each 5 rows
 	mov #varArray, r1
@@ -202,7 +221,7 @@ doneprntn:
 	mov #varArray, r4
 	call INSTR
 
-	mov #0, r0 ; SMP0
+	clr r0 ; SMP0
 	mov #varArray, r3
 	call EMUSEL
 
@@ -214,26 +233,22 @@ doneprntn:
 	CALL TNYDLY
 
 	jmp @#173000 ; Reboot!
-	
-end: 
-	wait
-	br end
 
 cartTitle:
 	.ascii "  Genjitsu"
 	.byte 16 ; 16o start russ
-	.ascii " smp 0.2  "
+	.ascii " smp 0.3  "
 	.byte 17 ; 17o end russ
 	.byte 0
 cartMoar:
-	.ascii "^"
+	.ascii " [BK]"
 	.byte 15, 0
 cartCrlf:
 	.byte 12,15,0
 cartMsgFilename:
 	.byte 16
-	.ascii "iMQ SU]ESTWU@]EGO / NOWOGO FAJLA?"
-	.byte 17,12,15,0
+	.ascii "iMQ FAJLA (SU]/NOW)?"
+	.byte 17,0
 cartRst:
 	.byte 16
 	.ascii "pEREZAGRUVA@SX!"
@@ -247,4 +262,3 @@ cartRst:
 	; --------------------
 
 	varArray = 32000
-	
