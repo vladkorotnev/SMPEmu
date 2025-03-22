@@ -254,4 +254,11 @@ cartRst:
 	.ascii "pEREZAGRUVA@SX!"
 	.byte 17,0
 
+	.= 1000
+
+	; -------------------- 
+	; !! END OF BOOTLOADER !!
+	;  Further data after 1000o  would need to be read manually !
+	; --------------------
+
 	varArray = 32000
