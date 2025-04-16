@@ -1,4 +1,5 @@
-PDP side firmware for the SMPEmu flash cart.
+PDP side (both BASIC 1.0 and 2.0) firmware for the SMPEmu flash cart.
+Use Page Down button (to the left of the space) for quick typing of the extension ".BIN".
 
 Genjitsu SMP Protocol Extension version 0.2:
 
