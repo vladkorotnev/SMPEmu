@@ -35,6 +35,12 @@ bas1:
 	
 	mov #27476, sp   ; Move stack to nearly end of RAM
 	
+	call @#LOADR
+	
+	mtps #0
+	jmp @#start ; start the loaded program
+
+LOADR:
 	mtps #340		;disable interrupts
 	bis	#10, r5		;writing to the SMP
 	mov	r5,(r1)
@@ -58,11 +64,10 @@ nxtb:
 	movb @#SMPIO, (r3)+	;read data byte from the SMP to the RAM
 	jsr	pc, (r2)
 	sob	r4, nxtb		;next data byte
+smpdone: ; Addition from issue #5 to fix keyboard, thanks Piotr
 	tst	@#SMPCMD
 	jsr	pc, (r2)
-	; start the loaded program
-	mtps #0
-	jmp @#start
+	rts pc
 	
 ;adresses for BASIC 1.0 (used by default)
 PRINTATTRS:
@@ -153,15 +158,9 @@ lsloop:
 	jsr pc, (r2)
 	movb (r3), r4
 	cmpb r4, #377 ; check if last one 0xFF
-	bhis lsdone ; and go out
+	bhis smpdone ; and go out
 	inc r3	; otherwise increment address 
     br lsloop ; and go on
-lsdone: 
-	; Addition from issue #5 to fix keyboard, thanks Piotr
-	tst @#SMPCMD
-	jsr pc,(r2)
-	
-	rts pc ; END EMULS
 
 EMUSEL:
 	; Set the emulated file name - zero terminated in r3
@@ -177,14 +176,9 @@ selloop:
 	movb (r3), @#SMPIO
 	jsr	pc,(r2)
 	tstb (r3)
-	beq seldone
+	beq smpdone
 	inc r3
 	br selloop
-seldone:
-	; Addition from issue #5 to fix keyboard, thanks Piotr
-	tst @#SMPCMD
-	jsr pc,(r2)
-	rts pc ; END EMUSEL
 
 
 	; ---------------------------
@@ -262,7 +256,6 @@ start:
 	
 	mov KBVECT, @#310
 
-	inc @DISIND ; disable SU, FK, VR/NR and RUS/LAT indication!
 	inc @DISCURS ; disable cursor
 
 	; LCD controller initialisation
@@ -281,7 +274,6 @@ start:
 	bic #41, @PRINTATTRS
 
 	; Retrieve array of file names
-	clr r0 ; SMP0
 	call EMULS
 	; Print the List, stopping each 5 rows
 	mov #varArray, r1
@@ -300,7 +292,9 @@ prntmoar:
 	mov r1, -(SP)
 	mov #cartMoar, r1
 	CALL @PRINT
+	inc @DISIND ; disable SU, FK, VR/NR and RUS/LAT indication!
 	CALL @GETCH
+	dec @DISIND ; enable indication (for B2.0 to preserve header line)
 	mov (SP)+, r1
 	mov #7, r3
 prntcrlf:
@@ -320,14 +314,15 @@ doneprntn:
 	mov #cartMsgFilename, r1
 	call @PRINT
 	
+	inc @DISIND
 	mov #varArray, r4
 	call INSTR
 	clrb (r4)
 
-	clr r0 ; SMP0
 	mov #varArray, r3
 	call EMUSEL
 
+	dec @DISIND
 	mov #cartCrlf, r1
 	CALL @PRINT
 
