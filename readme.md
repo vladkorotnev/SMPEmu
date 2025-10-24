@@ -9,6 +9,8 @@ Another user [azya52](https://github.com/azya52) has developed a fully working S
 
 Please check out their project instead: [azya52/STMP](https://github.com/azya52/STMP)
 
+There are also Raspberry Pi Pico module with bigger (1.8MB) storage memory: [azya52/PIMP](https://github.com/azya52/PIMP)
+
 In the light of this maybe I'll update the menu a bit sometime soon.
 
 Unfortunately my (public) github is becoming a mess of dead code and abandoned projects. 
